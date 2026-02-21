@@ -16,6 +16,13 @@
   <label for="body"><b>Content</b></label>
   <textarea name="body" cols="50" rows="10"><%= data.body %></textarea>
 
+  <label for="status"><b>Status</b></label>
+  <select name="status">
+    <option value="draft" <%= data.status === 'draft' ? 'selected' : '' %>>Draft</option>
+    <option value="published" <%= data.status === 'published' ? 'selected' : '' %>>Published</option>
+  </select>
+  <br><br>
+
   <input type="submit" value="Update" class="btn">
 
 </form>

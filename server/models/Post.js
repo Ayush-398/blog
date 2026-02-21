@@ -17,6 +17,11 @@ const PostSchema = new Schema({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+  status: {
+    type: String,
+    enum: ['draft', 'published'],
+    default: 'draft'
   }
 });
 

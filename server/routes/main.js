@@ -16,18 +16,18 @@ router.get('', async (req, res) => {
     let perPage = 10;
     let page = req.query.page || 1;
 
-    const data = await Post.aggregate([ { $sort: { createdAt: -1 } } ])
-    .skip(perPage * page - perPage)
-    .limit(perPage)
-    .exec();
+    const data = await Post.aggregate([{ $match: { status: 'published' } }, { $sort: { createdAt: -1 } }])
+      .skip(perPage * page - perPage)
+      .limit(perPage)
+      .exec();
 
     // Count is deprecated - please use countDocuments
     // const count = await Post.count();
-    const count = await Post.countDocuments({});
+    const count = await Post.countDocuments({ status: 'published' });
     const nextPage = parseInt(page) + 1;
     const hasNextPage = nextPage <= Math.ceil(count / perPage);
 
-    res.render('index', { 
+    res.render('index', {
       locals,
       data,
       current: page,
@@ -65,14 +65,14 @@ router.get('/post/:id', async (req, res) => {
   try {
     let slug = req.params.id;
 
-    const data = await Post.findById({ _id: slug });
+    const data = await Post.findOne({ _id: slug, status: 'published' });
 
     const locals = {
       title: data.title,
       description: "Simple Blog created with NodeJs, Express & MongoDb.",
     }
 
-    res.render('post', { 
+    res.render('post', {
       locals,
       data,
       currentRoute: `/post/${slug}`
@@ -99,9 +99,10 @@ router.post('/search', async (req, res) => {
     const searchNoSpecialChar = searchTerm.replace(/[^a-zA-Z0-9 ]/g, "")
 
     const data = await Post.find({
+      status: 'published',
       $or: [
-        { title: { $regex: new RegExp(searchNoSpecialChar, 'i') }},
-        { body: { $regex: new RegExp(searchNoSpecialChar, 'i') }}
+        { title: { $regex: new RegExp(searchNoSpecialChar, 'i') } },
+        { body: { $regex: new RegExp(searchNoSpecialChar, 'i') } }
       ]
     });
 

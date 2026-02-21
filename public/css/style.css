@@ -309,6 +309,26 @@ img {
   padding: 10px 0;
 }
 
+.status-tag {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-weight: bold;
+  margin-left: 10px;
+  vertical-align: middle;
+}
+
+.status-tag.draft {
+  background-color: #f0ad4e;
+  color: white;
+}
+
+.status-tag.published {
+  background-color: #5cb85c;
+  color: white;
+}
+
 /* SeachBar */
 .searchBar {
   visibility: hidden;
