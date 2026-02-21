@@ -21,3 +21,12 @@
   <input type="submit" value="Add" class="btn">
 
 </form>
+
+<script src="https://cdn.ckeditor.com/ckeditor5/41.1.0/classic/ckeditor.js"></script>
+<script>
+  ClassicEditor
+    .create(document.querySelector('textarea[name="body"]'))
+    .catch(error => {
+      console.error(error);
+    });
+</script>

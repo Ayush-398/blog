@@ -18,11 +18,20 @@
 
   <label for="status"><b>Status</b></label>
   <select name="status">
-    <option value="draft" <%= data.status === 'draft' ? 'selected' : '' %>>Draft</option>
-    <option value="published" <%= data.status === 'published' ? 'selected' : '' %>>Published</option>
+    <option value="draft" <%=data.status==='draft' ? 'selected' : '' %>>Draft</option>
+    <option value="published" <%=data.status==='published' ? 'selected' : '' %>>Published</option>
   </select>
   <br><br>
 
   <input type="submit" value="Update" class="btn">
 
 </form>
+
+<script src="https://cdn.ckeditor.com/ckeditor5/41.1.0/classic/ckeditor.js"></script>
+<script>
+  ClassicEditor
+    .create(document.querySelector('textarea[name="body"]'))
+    .catch(error => {
+      console.error(error);
+    });
+</script>
