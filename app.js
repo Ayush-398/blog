@@ -12,7 +12,7 @@ const { isActiveRoute } = require('./server/helpers/routeHelpers');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-  
+
 // Connect to DB
 connectDB();
 
@@ -39,12 +39,13 @@ app.set('layout', './layouts/main');
 app.set('view engine', 'ejs');
 
 
-app.locals.isActiveRoute = isActiveRoute; 
+app.locals.isActiveRoute = isActiveRoute;
+app.locals.gaMeasurementId = process.env.GA_MEASUREMENT_ID;
 
 
 app.use('/', require('./server/routes/main'));
 app.use('/', require('./server/routes/admin'));
 
-app.listen(PORT, ()=> {
+app.listen(PORT, () => {
   console.log(`App listening on port ${PORT}`);
 });
