@@ -12,6 +12,12 @@ const fs = require('fs');
 const adminLayout = '../views/layouts/admin';
 const jwtSecret = process.env.JWT_SECRET;
 
+// Ensure upload directory exists
+const uploadDir = path.join(__dirname, '../../public/uploads/');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 // Multer Config
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -326,8 +332,9 @@ router.post('/upload', authMiddleware, upload.single('upload'), (req, res) => {
       url: url
     });
   } catch (error) {
-    console.error('Upload Route Error:', error);
-    res.status(500).json({ error: 'Upload failed' });
+    console.error('--- UPLOAD ROUTE CRASH ---');
+    console.error(error);
+    res.status(500).json({ error: 'Upload failed', details: error.message });
   }
 });
 
