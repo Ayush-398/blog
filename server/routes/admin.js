@@ -18,6 +18,46 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+/**
+ * Helper: Silent Garbage Collection
+ * Deletes images that are NOT used in any blog post.
+ * Only deletes files older than 1 hour to prevent deleting images in progress.
+ */
+const silentCleanup = async () => {
+  try {
+    const allPosts = await Post.find();
+    let usedImages = new Set();
+    const imgRegex = /\/uploads\/[^\s"'>]+/g;
+
+    allPosts.forEach(post => {
+      const images = (post.body || "").match(imgRegex);
+      if (images) {
+        images.forEach(img => usedImages.add(path.basename(img)));
+      }
+    });
+
+    if (fs.existsSync(uploadDir)) {
+      const files = fs.readdirSync(uploadDir);
+      files.forEach(file => {
+        if (!usedImages.has(file)) {
+          const filePath = path.join(uploadDir, file);
+          try {
+            const stats = fs.statSync(filePath);
+            const now = Date.now();
+            const oneHour = 60 * 60 * 1000;
+            if (now - stats.mtimeMs > oneHour) {
+              fs.unlinkSync(filePath);
+              console.log('Silent Cleanup: Removed abandoned image:', file);
+            }
+          } catch (err) { /* silent fail */ }
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Silent Cleanup Error:', error);
+  }
+};
+
 // Multer Config
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -112,6 +152,9 @@ router.get('/dashboard', authMiddleware, async (req, res) => {
       title: 'Dashboard',
       description: 'Simple Blog created with NodeJs, Express & MongoDb.'
     }
+
+    // Trigger silent cleanup in background (don't await)
+    silentCleanup();
 
     const data = await Post.find();
     res.render('admin/dashboard', {
