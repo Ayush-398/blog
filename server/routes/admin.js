@@ -4,9 +4,25 @@ const Post = require('../models/Post');
 const User = require('../models/User');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
 
 const adminLayout = '../views/layouts/admin';
 const jwtSecret = process.env.JWT_SECRET;
+
+// Multer Config
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, '../../public/uploads/'))
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + path.extname(file.originalname))
+  }
+});
+
+const upload = multer({ storage: storage });
 
 
 /**
@@ -17,6 +33,7 @@ const authMiddleware = (req, res, next) => {
   const token = req.cookies.token;
 
   if (!token) {
+    console.log('Auth Failed: No token found in cookies');
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
@@ -25,6 +42,7 @@ const authMiddleware = (req, res, next) => {
     req.userId = decoded.userId;
     next();
   } catch (error) {
+    console.log('Auth Failed: Invalid token');
     res.status(401).json({ message: 'Unauthorized' });
   }
 }
@@ -250,7 +268,27 @@ router.post('/register', async (req, res) => {
 router.delete('/delete-post/:id', authMiddleware, async (req, res) => {
 
   try {
-    await Post.deleteOne({ _id: req.params.id });
+    const post = await Post.findById(req.params.id);
+    if (post) {
+      // Find all image links in the post body
+      const imgRegex = /\/uploads\/[^\s"'>]+/g;
+      const images = post.body.match(imgRegex);
+
+      if (images) {
+        images.forEach(img => {
+          const filePath = path.join(__dirname, '../../public', img);
+          if (fs.existsSync(filePath)) {
+            try {
+              fs.unlinkSync(filePath);
+              console.log('Deleted image:', filePath);
+            } catch (err) {
+              console.error('Error deleting image:', err);
+            }
+          }
+        });
+      }
+      await Post.deleteOne({ _id: req.params.id });
+    }
     res.redirect('/dashboard');
   } catch (error) {
     console.log(error);
@@ -267,6 +305,59 @@ router.get('/logout', (req, res) => {
   res.clearCookie('token');
   //res.json({ message: 'Logout successful.'});
   res.redirect('/');
+});
+
+
+/**
+ * POST /
+ * Admin - Upload Image
+*/
+router.post('/upload', authMiddleware, upload.single('upload'), (req, res) => {
+  console.log('--- Image Upload Request ---');
+  try {
+    const file = req.file;
+    if (!file) {
+      console.log('Upload Failed: No file provided');
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    console.log('File uploaded to:', file.path);
+    const url = `/uploads/${file.filename}`;
+    res.json({
+      url: url
+    });
+  } catch (error) {
+    console.error('Upload Route Error:', error);
+    res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
+
+/**
+ * POST /
+ * Admin - Delete Image (Real-time cleanup)
+ */
+router.post('/delete-image', authMiddleware, (req, res) => {
+  const { url } = req.body;
+
+  if (!url || !url.startsWith('/uploads/')) {
+    return res.status(400).json({ error: 'Invalid image URL' });
+  }
+
+  const filename = path.basename(url);
+  const filePath = path.join(__dirname, '../../public/uploads/', filename);
+
+  if (fs.existsSync(filePath)) {
+    try {
+      fs.unlinkSync(filePath);
+      console.log('Real-time cleanup: Deleted image', filePath);
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Real-time cleanup error:', err);
+      res.status(500).json({ error: 'Failed to delete image' });
+    }
+  } else {
+    res.status(404).json({ error: 'Image not found' });
+  }
 });
 
 

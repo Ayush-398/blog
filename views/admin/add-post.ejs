@@ -3,13 +3,16 @@
   <h2>Add New Post</h2>
 </div>
 
-<form action="/add-post" method="POST">
+<form action="/add-post" method="POST" id="add-post-form">
 
   <label for="title"><b>Title</b></label>
-  <input type="text" placeholder="Post Title" name="title">
+  <input type="text" placeholder="Post Title" name="title" required>
 
   <label for="body"><b>Content</b></label>
-  <textarea name="body" cols="50" rows="10"></textarea>
+  <!-- Hidden input to hold the actual editor data -->
+  <input type="hidden" name="body" id="post-body-input">
+  <!-- The visible editor container -->
+  <div id="editor"></div>
 
   <label for="status"><b>Status</b></label>
   <select name="status">
@@ -22,11 +25,118 @@
 
 </form>
 
-<script src="https://cdn.ckeditor.com/ckeditor5/41.1.0/classic/ckeditor.js"></script>
+<style>
+  .ck-editor__editable_inline {
+    min-height: 500px;
+    background: #fff !important;
+    cursor: text !important;
+    padding: 20px !important;
+    border: 1px solid #ddd !important;
+  }
+
+  /* Ensure the toolbar is always visible and on top */
+  .ck-toolbar {
+    border-radius: 0 !important;
+    border-bottom: none !important;
+    background: #f8f9fa !important;
+  }
+</style>
+
+<!-- Using Stable Classic Build v35.0.1 -->
+<script src="https://cdn.ckeditor.com/ckeditor5/35.0.1/classic/ckeditor.js"></script>
+
 <script>
+  // Custom Upload Adapter Bridge
+  class MyUploadAdapter {
+    constructor(loader) {
+      this.loader = loader;
+    }
+    upload() {
+      return this.loader.file.then(file => new Promise((resolve, reject) => {
+        const data = new FormData();
+        data.append('upload', file);
+
+        fetch('/upload', {
+          method: 'POST',
+          body: data
+        })
+          .then(response => response.json())
+          .then(result => {
+            if (result.error) return reject(result.error);
+            resolve({ default: result.url });
+          })
+          .catch(err => {
+            console.error('Upload error:', err);
+            reject('Upload failed');
+          });
+      }));
+    }
+    abort() { }
+  }
+
+  function MyCustomUploadAdapterPlugin(editor) {
+    editor.plugins.get('FileRepository').createUploadAdapter = (loader) => {
+      return new MyUploadAdapter(loader);
+    };
+  }
+
+  // Initialize Editor
   ClassicEditor
-    .create(document.querySelector('textarea[name="body"]'))
+    .create(document.querySelector('#editor'), {
+      extraPlugins: [MyCustomUploadAdapterPlugin],
+      toolbar: {
+        items: [
+          'heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', '|', 'insertTable', 'uploadImage', 'mediaEmbed', '|', 'undo', 'redo'
+        ],
+        viewportTopOffset: 30
+      },
+      image: {
+        toolbar: [
+          'imageStyle:block', 'imageStyle:side', '|',
+          'toggleImageCaption', 'imageTextAlternative'
+        ]
+      }
+    })
+    .then(editor => {
+      console.log('Stable Editor Ready');
+      const bodyInput = document.querySelector('#post-body-input');
+
+      // Track which images are currently in the editor
+      let currentImages = new Set();
+
+      const updateImagesSet = (html) => {
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        const images = Array.from(div.querySelectorAll('img')).map(img => img.getAttribute('src'));
+        return new Set(images);
+      };
+
+      currentImages = updateImagesSet(editor.getData());
+
+      // SYNC DATA & CLEANUP (Optimized)
+      let syncTimeout;
+      editor.model.document.on('change:data', () => {
+        clearTimeout(syncTimeout);
+        syncTimeout = setTimeout(() => {
+          const data = editor.getData();
+          bodyInput.value = data;
+
+          const nextImages = updateImagesSet(data);
+          // Find URLs that were in currentImages but are NOT in nextImages
+          for (const url of currentImages) {
+            if (!nextImages.has(url) && url.startsWith('/uploads/')) {
+              fetch('/delete-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+              }).catch(err => console.error('Cleanup failed:', err));
+            }
+          }
+          currentImages = nextImages;
+        }, 300); // 300ms debounce to keep it snappy
+      });
+    })
     .catch(error => {
-      console.error(error);
+      console.error('Init Error:', error);
     });
 </script>

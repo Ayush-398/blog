@@ -351,6 +351,40 @@ img {
   border: 0;
 }
 
+/* Image Styling */
+.article figure.image {
+  margin: 2rem 0;
+  text-align: center;
+}
+
+.article figure.image img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--border-radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.article figure.image figcaption {
+  font-size: 0.9rem;
+  color: var(--gray);
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+.article img[style*="float:left"] {
+  float: left;
+  margin-right: 1.5rem;
+  margin-bottom: 1rem;
+  max-width: 50%;
+}
+
+.article img[style*="float:right"] {
+  float: right;
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+  max-width: 50%;
+}
+
 #searchClose {
   position: absolute;
   top: 0;

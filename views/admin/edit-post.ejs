@@ -1,37 +1,146 @@
 <a href="/dashboard">&larr; Back</a>
 <div class="admin-title">
-  <h2>View / Edit Post</h2>
+    <h2>View / Edit Post</h2>
 
-  <form action="/delete-post/<%= data._id %>?_method=DELETE" method="POST">
-    <input type="submit" value="Delete" class="btn-delete btn">
-  </form>
+    <form action="/delete-post/<%= data._id %>?_method=DELETE" method="POST">
+        <input type="submit" value="Delete" class="btn-delete btn">
+    </form>
 
 </div>
 
-<form action="/edit-post/<%= data._id %>?_method=PUT" method="POST">
+<form action="/edit-post/<%= data._id %>?_method=PUT" method="POST" id="edit-post-form">
 
-  <label for="title"><b>Title</b></label>
-  <input type="text" placeholder="Post Title" name="title" value="<%= data.title %>">
+    <label for="title"><b>Title</b></label>
+    <input type="text" placeholder="Post Title" name="title" value="<%= data.title %>" required>
 
-  <label for="body"><b>Content</b></label>
-  <textarea name="body" cols="50" rows="10"><%= data.body %></textarea>
+    <label for="body"><b>Content</b></label>
+    <!-- Hidden input to hold the actual editor data -->
+    <input type="hidden" name="body" id="post-body-input" value="<%= data.body %>">
+    <!-- The visible editor container -->
+    <div id="editor"><%- data.body %></div>
 
-  <label for="status"><b>Status</b></label>
-  <select name="status">
-    <option value="draft" <%=data.status==='draft' ? 'selected' : '' %>>Draft</option>
-    <option value="published" <%=data.status==='published' ? 'selected' : '' %>>Published</option>
-  </select>
-  <br><br>
+    <label for="status"><b>Status</b></label>
+    <select name="status">
+        <option value="draft" <%=data.status==='draft' ? 'selected' : '' %>>Draft</option>
+        <option value="published" <%=data.status==='published' ? 'selected' : '' %>>Published</option>
+    </select>
+    <br><br>
 
-  <input type="submit" value="Update" class="btn">
+    <input type="submit" value="Update" class="btn">
 
 </form>
 
-<script src="https://cdn.ckeditor.com/ckeditor5/41.1.0/classic/ckeditor.js"></script>
+<style>
+    .ck-editor__editable_inline {
+        min-height: 500px;
+        background: #fff !important;
+        cursor: text !important;
+        padding: 20px !important;
+        border: 1px solid #ddd !important;
+    }
+
+    /* Ensure the toolbar is always visible and on top */
+    .ck-toolbar {
+        border-radius: 0 !important;
+        border-bottom: none !important;
+        background: #f8f9fa !important;
+    }
+</style>
+
+<!-- Using Stable Classic Build v35.0.1 -->
+<script src="https://cdn.ckeditor.com/ckeditor5/35.0.1/classic/ckeditor.js"></script>
+
 <script>
-  ClassicEditor
-    .create(document.querySelector('textarea[name="body"]'))
-    .catch(error => {
-      console.error(error);
-    });
+    // Custom Upload Adapter Bridge
+    class MyUploadAdapter {
+        constructor(loader) {
+            this.loader = loader;
+        }
+        upload() {
+            return this.loader.file.then(file => new Promise((resolve, reject) => {
+                const data = new FormData();
+                data.append('upload', file);
+
+                fetch('/upload', {
+                    method: 'POST',
+                    body: data
+                })
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.error) return reject(result.error);
+                        resolve({ default: result.url });
+                    })
+                    .catch(err => {
+                        console.error('Upload error:', err);
+                        reject('Upload failed');
+                    });
+            }));
+        }
+        abort() { }
+    }
+
+    function MyCustomUploadAdapterPlugin(editor) {
+        editor.plugins.get('FileRepository').createUploadAdapter = (loader) => {
+            return new MyUploadAdapter(loader);
+        };
+    }
+
+    // Initialize Editor
+    ClassicEditor
+        .create(document.querySelector('#editor'), {
+            extraPlugins: [MyCustomUploadAdapterPlugin],
+            toolbar: {
+                items: [
+                    'heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', '|', 'insertTable', 'uploadImage', 'mediaEmbed', '|', 'undo', 'redo'
+                ],
+                viewportTopOffset: 30
+            },
+            image: {
+                toolbar: [
+                    'imageStyle:block', 'imageStyle:side', '|',
+                    'toggleImageCaption', 'imageTextAlternative'
+                ]
+            }
+        })
+        .then(editor => {
+            console.log('Stable Editor Ready');
+            const bodyInput = document.querySelector('#post-body-input');
+
+            // Track which images are currently in the editor
+            let currentImages = new Set();
+
+            const updateImagesSet = (html) => {
+                const div = document.createElement('div');
+                div.innerHTML = html;
+                const images = Array.from(div.querySelectorAll('img')).map(img => img.getAttribute('src'));
+                return new Set(images);
+            };
+
+            currentImages = updateImagesSet(editor.getData());
+
+            // SYNC DATA & CLEANUP (Optimized)
+            let syncTimeout;
+            editor.model.document.on('change:data', () => {
+                clearTimeout(syncTimeout);
+                syncTimeout = setTimeout(() => {
+                    const data = editor.getData();
+                    bodyInput.value = data;
+
+                    const nextImages = updateImagesSet(data);
+                    for (const url of currentImages) {
+                        if (!nextImages.has(url) && url.startsWith('/uploads/')) {
+                            fetch('/delete-image', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ url })
+                            }).catch(err => console.error('Cleanup failed:', err));
+                        }
+                    }
+                    currentImages = nextImages;
+                }, 300); // 300ms debounce
+            });
+        })
+        .catch(error => {
+            console.error('Init Error:', error);
+        });
 </script>
